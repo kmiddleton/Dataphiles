@@ -1,0 +1,68 @@
+---
+title: "Gamma"
+format: html
+---
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(brms)
+library(posterior)
+library(bayesplot)
+```
+
+
+## Data
+
+```{r}
+set.seed(3475934)
+
+shape <- 10
+scale <- 2
+rate <- 1 / scale
+
+n <- 1e3
+
+y <- rgamma(n, shape = shape, scale = scale)
+```
+
+$$\bar{y} = shape \cdot scale$$
+
+```{r}
+shape * scale
+mean(y)
+```
+
+$$Var(y) = shape \cdot scale ^ 2$$
+
+$$s = \sqrt{shape \cdot scale ^ 2}$$
+
+```{r}
+shape * scale^2
+var(y)
+
+sqrt(shape * scale^2)
+sd(y)
+```
+
+## brms model
+
+```{r}
+fm <- brm(y ~ 1, family = Gamma,
+          data = list(y = y),
+          backend = "cmdstan")
+```
+
+```{r}
+prior_summary(fm)
+```
+
+
+```{r}
+post <- as_draws_df(fm)
+
+```
+
