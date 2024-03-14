@@ -43,11 +43,11 @@ set.seed(3475934)
 
 x_mean <- 5
 alpha <- 10
-(beta <- alpha / y_mean)
+(beta <- alpha / x_mean)
 
 n <- 1e4
 
-GD <- tibble(x = rgamma(n, shape = shape, rate = rate))
+GD <- tibble(x = rgamma(n, shape = alpha, rate = beta))
 
 ggplot(GD, aes(x)) +
   stat_slabinterval() +
@@ -129,11 +129,14 @@ ggplot() +
 ## brms model
 
 ```{r}
-fm <- brm(x ~ 1, family = Gamma,
+priors <- c(prior(normal(1, 2.5), class = "Intercept", lb = 0),
+            prior(gamma(2, 2), class = "shape"))
+fm <- brm(x ~ 1,
+          family = Gamma,
           data = GD,
-          prior = prior(normal(1, 2.5), class = "Intercept", lb = 0) +
-            prior(gamma(2, 2), class = "shape"),
-          backend = "cmdstan")
+          prior = priors,
+          backend = "cmdstan",
+          cores = 4)
 ```
 
 ```{r}
@@ -141,19 +144,22 @@ prior_summary(fm)
 ```
 
 ```{r}
+
+mcmc_combo(fm, pars = c("b_Intercept", "shape"),
+           combo = c("dens_overlay", "rank_overlay"))
+
 pp_check(fm, ndraws = 100)
 ```
 
 
 ```{r}
 post <- as_draws_df(fm)
-
-mcmc_combo(fm, pars = c("b_Intercept", "shape"),
-           combo = c("dens_overlay", "rank_overlay"))
 ```
 
 
 ```{r}
+
+mean(GD$x)
 summary(fm)
 
 1 / fixef(fm)
