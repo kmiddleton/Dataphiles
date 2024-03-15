@@ -136,7 +136,8 @@ fm <- brm(x ~ 1,
           data = GD,
           prior = priors,
           backend = "cmdstan",
-          cores = 4)
+          cores = 4,
+          control = list(step_size = 0.1))
 ```
 
 ```{r}
@@ -156,12 +157,22 @@ pp_check(fm, ndraws = 100)
 post <- as_draws_df(fm)
 ```
 
+$$E[y] = \mu = \exp(\alpha + \beta x)$$
+
+$$Var(y) = \phi~\mu^2$$
+
+where $\phi$ is dispersion
+
 
 ```{r}
 
 mean(GD$x)
+var(GD$x)
+
 summary(fm)
 
-1 / fixef(fm)
+# beta = 1 / theta
+
+9.97 * exp(0.2)^2
 ```
 
