@@ -1,6 +1,11 @@
 ---
 title: "Gamma"
-format: html
+format:
+  html:
+    toc: true
+    number-depth: 3
+    toc-location: left
+    embed-resources: true
 ---
 
 ## Resources
