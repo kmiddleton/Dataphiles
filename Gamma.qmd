@@ -3,6 +3,12 @@ title: "Gamma"
 format: html
 ---
 
+## Resources
+
+- https://discourse.mc-stan.org/t/output-for-family-in-brms/9379
+- https://discourse.mc-stan.org/t/decoding-smooth-fits-in-brms/34473
+- https://stats.stackexchange.com/questions/96972/how-to-interpret-parameters-in-glm-with-family-gamma
+
 ```{r}
 #| label: setup
 #| message: false
@@ -17,6 +23,19 @@ library(patchwork)
 
 color_scheme_set(scheme = "red")
 theme_set(theme_ggdist())
+
+prior_pred_lines <- function(post) {
+  map(.x = seq_len(nrow(post)),
+    .f = function(ii, post){
+      p_Intercept <- post$b_Intercept[ii]
+      p_shape <- post$shape[ii]
+      tibble(ii = ii,
+             x = seq(0, 30, length.out = 100),
+             y = dgamma(x, shape = exp(p_Intercept), rate = 1 / p_shape))
+    }, post = post) |> 
+  list_rbind()
+}
+
 ```
 
 ## Gamma distribution
@@ -27,13 +46,15 @@ $$PDF(x)=\frac{1}{\Gamma(k)~\theta^k} x^{k - 1}~e^{-x/\theta}$$
 
 
 
-Shape ($\alpha$) and Rate ($\beta$)
+Shape ($\alpha = \theta$) and Rate ($\beta$)
 
 $$PDF(x) = \frac{\beta^\alpha}{\Gamma(\alpha)} x^{\alpha - 1}~e^{-\beta x}$$
 
 Inverse scale parameter = rate
 
-$$\beta = \frac{1}{\theta}$$
+$$\beta = \frac{1}{\theta} = \frac{1}{\alpha}$$
+
+$$\bar{x} = \mu = \frac{\alpha}{\beta}$$
 
 
 ## Data
@@ -41,44 +62,63 @@ $$\beta = \frac{1}{\theta}$$
 ```{r}
 set.seed(3475934)
 
-x_mean <- 5
-alpha <- 10
+x_mean <- 4
+alpha <- 12
 (beta <- alpha / x_mean)
 
 n <- 1e4
 
 GD <- tibble(x = rgamma(n, shape = alpha, rate = beta))
-
-ggplot(GD, aes(x)) +
-  stat_slabinterval() +
-ggplot(GD, aes(log(x))) +
-  stat_slabinterval()
 ```
 
+```{r}
+#| echo: false
+ggplot(GD, aes(x)) +
+  stat_dotsinterval() +
+ggplot(GD, aes(log(x))) +
+  stat_dotsinterval()
+```
 
-$$\bar{x} = \frac{\alpha}{\beta}$$
 
 ```{r}
 alpha / beta
 mean(GD$x)
 ```
 
-$$Var(x) = \frac{\alpha}{\beta^2} $$
-
-$$s = \sqrt{\frac{\alpha}{\beta^2}}$$
+$$Var(x) = \frac{\alpha}{\beta^2}$$
 
 ```{r}
 alpha / (beta^2)
 var(GD$x)
-
-sqrt(alpha / (beta^2))
-sd(GD$x)
 ```
 
-## GLM and 
+$$Var(x) = \phi~\mu^2$$
+
+where $\phi$ is a *dispersion* parameter
 
 ```{r}
-summary(glm(x ~ 1, data = GD))
+(alpha / (beta^2)) / ((alpha / beta)^2)
+```
+
+
+## GLM 
+
+```{r}
+fm_glm <- glm(x ~ 1, data = GD, family = Gamma(link = log))
+summary(fm_glm)
+```
+
+## Mean
+
+$$\mu = \exp(\alpha + \beta~x)$$
+
+```{r}
+(fm_beta <- coef(fm_glm))
+exp(fm_beta)
+alpha / beta
+
+# alpha
+1 / MASS::gamma.dispersion(fm_glm)
 ```
 
 
@@ -86,41 +126,55 @@ summary(glm(x ~ 1, data = GD))
 
 ```{r}
 get_prior(x ~ 1,
-          family = Gamma,
+          family = Gamma(link = log),
           data = GD)
 ```
 
-```{r}
-ggplot(tibble(x = rgamma(1e4, shape = 0.01, rate = 0.01)), aes(x)) +
-  stat_slabinterval()
-```
 
-
-## Prior prediction
+## Prior prediction - default
 
 ```{r}
+#| message: false
+
+priors <- c(prior(student_t(3, 1.4, 2.5), class = "Intercept"),
+            prior(gamma(0.01, 0.01), class = "shape"))
+
 PP <- brm(x ~ 1,
-          family = Gamma,
-          prior = prior(normal(1, 2.5), class = "Intercept", lb = 0) +
-            prior(gamma(2, 2), class = "shape"),
+          family = Gamma(link = log),
+          prior = priors,
           data = GD,
-          sample_prior = "only")
+          sample_prior = "only",
+          refresh = 0)
 
 (post <- as_draws_df(PP) |> 
   slice_sample(n = 200))
 
-PP_lines <- map(.x = seq_len(nrow(post)),
-    .f = function(ii, post){
-      p_Intercept <- post$b_Intercept[ii]
-      p_shape <- post$shape[ii]
-      tibble(ii = ii,
-             x = seq(0, 30, length.out = 100),
-             y = dgamma(x, shape = p_shape, rate = p_Intercept / p_shape))
-    }, post = post) |> 
-  list_rbind()
+ggplot() +
+  geom_line(data = prior_pred_lines(post), aes(x, y, group = ii),
+            color = "firebrick4", alpha = 0.5) +
+  geom_dotsinterval(data = GD, aes(x))
+```
+
+
+## Prior prediction - improved
+
+```{r}
+(pr_mean <- log(mean(GD$x))) |> round(2)
+priors <- c(prior(student_t(3, 1.4, 2.5), class = "Intercept"),
+            prior(gamma(1.4, 1/1.4), class = "shape"))
+
+PP <- brm(x ~ 1,
+          family = Gamma(link = log),
+          prior = priors,
+          data = GD,
+          sample_prior = "only",
+          refresh = 0)
+
+(post <- as_draws_df(PP) |> 
+  slice_sample(n = 200))
 
 ggplot() +
-  geom_line(data = PP_lines, aes(x, y, group = ii),
+  geom_line(data = prior_pred_lines(post), aes(x, y, group = ii),
             color = "firebrick4", alpha = 0.5) +
   geom_dotsinterval(data = GD, aes(x))
 ```
@@ -129,15 +183,18 @@ ggplot() +
 ## brms model
 
 ```{r}
-priors <- c(prior(normal(1, 2.5), class = "Intercept", lb = 0),
-            prior(gamma(2, 2), class = "shape"))
 fm <- brm(x ~ 1,
-          family = Gamma,
+          family = Gamma(link = log),
           data = GD,
           prior = priors,
           backend = "cmdstan",
           cores = 4,
-          control = list(step_size = 0.1))
+          init = list(list(Intercept = 1, shape = 2),
+                      list(Intercept = 1, shape = 2),
+                      list(Intercept = 1, shape = 2),
+                      list(Intercept = 1, shape = 2)),
+          control = list(step_size = 0.01),
+          refresh = 0)
 ```
 
 ```{r}
@@ -145,7 +202,6 @@ prior_summary(fm)
 ```
 
 ```{r}
-
 mcmc_combo(fm, pars = c("b_Intercept", "shape"),
            combo = c("dens_overlay", "rank_overlay"))
 
@@ -154,25 +210,12 @@ pp_check(fm, ndraws = 100)
 
 
 ```{r}
-post <- as_draws_df(fm)
+ps <- posterior_summary(fm)
 ```
-
-$$E[y] = \mu = \exp(\alpha + \beta x)$$
-
-$$Var(y) = \phi~\mu^2$$
-
-where $\phi$ is dispersion
 
 
 ```{r}
-
+(mean_est <- exp(ps[1, 1]))
 mean(GD$x)
-var(GD$x)
-
-summary(fm)
-
-# beta = 1 / theta
-
-9.97 * exp(0.2)^2
 ```
 
