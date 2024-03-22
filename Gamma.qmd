@@ -78,6 +78,7 @@ GD <- tibble(x = rgamma(n, shape = alpha, rate = beta))
 
 ```{r}
 #| echo: false
+
 ggplot(GD, aes(x)) +
   stat_dotsinterval() +
 ggplot(GD, aes(log(x))) +
