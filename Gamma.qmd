@@ -150,6 +150,7 @@ PP <- brm(x ~ 1,
           prior = priors,
           data = GD,
           sample_prior = "only",
+          backend = "cmdstanr",
           refresh = 0)
 
 (post <- as_draws_df(PP) |> 
@@ -173,6 +174,7 @@ PP <- brm(x ~ 1,
           family = Gamma(link = log),
           prior = priors,
           data = GD,
+          backend = "cmdstanr",
           sample_prior = "only",
           refresh = 0)
 
@@ -193,7 +195,7 @@ fm <- brm(x ~ 1,
           family = Gamma(link = log),
           data = GD,
           prior = priors,
-          backend = "cmdstan",
+          backend = "cmdstanr",
           cores = 4,
           init = list(list(Intercept = 1, shape = 2),
                       list(Intercept = 1, shape = 2),
