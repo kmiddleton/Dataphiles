@@ -45,19 +45,22 @@ prior_pred_lines <- function(post) {
 
 ## Gamma distribution
 
-Shape ($\theta$) and Scale ($k$)
+Shape ($\theta$) and Scale ($k$):
 
 $$PDF(x)=\frac{1}{\Gamma(k)~\theta^k} x^{k - 1}~e^{-x/\theta}$$
 
 
-
-Shape ($\alpha = \theta$) and Rate ($\beta$)
+Shape ($\alpha = \theta$) and Rate ($\beta$): 
 
 $$PDF(x) = \frac{\beta^\alpha}{\Gamma(\alpha)} x^{\alpha - 1}~e^{-\beta x}$$
 
-Inverse scale parameter = rate
+where $\Gamma$ is the Gamma function
+
+Inverse scale parameter = rate:
 
 $$\beta = \frac{1}{\theta} = \frac{1}{\alpha}$$
+
+Mean:
 
 $$\bar{x} = \mu = \frac{\alpha}{\beta}$$
 
